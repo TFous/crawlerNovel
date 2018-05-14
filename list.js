@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs'); // 引入fs模块
 const getNovel = require('./getNovel'); // 引入fs模块
-var MongoClient = require('mongodb').MongoClient ,
+var MongoClient = require('mongodb').MongoClient,
     Server = require('mongodb').Server;
 var http = require("https");
 const mongoClient = new MongoClient(new Server('localhost', 27017));
@@ -17,20 +17,21 @@ let getList = async () => {
     const lists = await page.evaluate((sel) => {
         const pagesA = Array.from($(sel).find('li>div.s + a'));
         const pagesImg = Array.from($(sel).find('li>div.s + a>img'));
-        const urls = pagesImg.map((a,i)=> {
-                return {
-                    href:  pagesA[i].href.trim(),
-                    name: pagesA[i].text,
-                    imgSrc: a.src,
-                    code:pagesA[i].href.trim().split('/Shtml')[1].split('.html')[0]
-                };
+        const urls = pagesImg.map((a, i) => {
+            return {
+                href: pagesA[i].href.trim(),
+                name: pagesA[i].text,
+                imgSrc: a.src,
+                code: pagesA[i].href.trim().split('/Shtml')[1].split('.html')[0]
+            };
         });
         return urls;
     }, doms);
+    browser.close();
     return lists;
 };
 let scrape = async () => {
-    return getList().then(list =>{
+    return getList().then(list => {
         // list.map(item=>{
         //     http.get(item.img,function (res) {
         //         var imgData = "";
@@ -54,20 +55,40 @@ let scrape = async () => {
     })
 
 }
+let getNovelPage = async () => {
+    return scrape().then(async (value) => {
+        const browser = await puppeteer.launch({headless: true});
+        const data = await Promise.all(value.map(async item => {
+            const page = await browser.newPage();
+            page.setDefaultNavigationTimeout(100000)
+            await page.goto(item.href);
+            const result = await page.evaluate(() => {
+                let dom = 'body > div:nth-child(5) > div.show > div:nth-child(4) > div.showDown > ul > li:nth-child(1) > a'
+                let href = document.querySelector(dom).href.trim();
+                return {
+                    href
+                }
+            });
+            await page.close();
+            return result
+        }))
+        browser.close();
+        return data
+    });
+}
 
-scrape().then((value) => {
-    // let all = ''
-    console.log(value)
-    value.map(async item=>{
-        await getNovel.getNovelList(item.href)
-    })
-    // mongoClient.connect(function(err, db) {
-    //     if (err) throw err;
-    //     var dbo = db.db("test");
-    //         dbo.collection("列表").insertMany(value, function(err, res) {
-    //             if (err) throw err;
-    //             console.log("文档插入成功");
-    //             db.close();
-    //         });
-    // });
-});
+getNovelPage().then(async lists => {
+    await Promise.all(lists.map(async function (item ,i ) {
+        if(i === 1){
+            let href = await item.href
+            let hrefSplit = href.split('/')
+            let id = hrefSplit[hrefSplit.length-2]
+
+            console.log(id)
+            await getNovel.novelBookSave(href,id)
+        }
+    }))
+    // Promise.race(promises).then(function (item) {
+    //     console.log(item)
+    // })
+})
