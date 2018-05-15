@@ -25,56 +25,78 @@ const getNovelList = async (url) => {
     // await getNovelData(lists)
     return lists;
 };
-const getNovelData = async (lists,id) => {
+const getNovelData = async (lists, id) => {
     console.log('======获取小说章节列表成功========')
+    console.log(lists.length)
     const browser = await puppeteer.launch({headless: true});
-    await Promise.all(lists.map(async function (item,i) {
-        if(i>300){
-            return
-        }
-            const page = await browser.newPage();
-            page.setDefaultNavigationTimeout(3000000)
-            await page.goto(item.href);
-            await page.waitForSelector('#content1');
-            const result = await page.evaluate(() => {
-                let title = document.querySelector('#info > div.txt_cont > h1').innerText;
-                let text = document.querySelector('#content1').innerText;
-                return {
-                    title,
-                    text
-                }
-            });
-            await page.close();
-            await mongoClient.connect(function (err, db) {
-                if (err) throw err;
-                var dbo = db.db("novel");
-                dbo.collection("novel" + id).insertOne(result, function (err, res) {
-                    if (err) throw err;
-                    console.log("文档插入成功");
-                    db.close();
-                });
-            });
-    }))
-    browser.close();
+    const page = await browser.newPage();
+    let i = 0
+    let length = lists.length
+    for (;i<length;i++){
+        await page.goto(lists[i].href);
+        await page.waitForSelector('#content1');
+        let result = await page.evaluate(() => {
+            let title = document.querySelector('#info > div.txt_cont > h1').innerText;
+            let text = document.querySelector('#content1').innerText;
+            return {
+                title,
+                text
+            }
+        });
+        // saveData(result,id)
+        await fs.appendFile('./downLoad/'+ id +'.json',JSON.stringify(result),function(err){
+            if(err){
+                console.log("文件写入失败")
+            }else{
+                console.log(id + "===================文件追加成功");
+
+            }
+        })
+        // await page.close();
+    }
+    // await Promise.all(lists.forEach(async function (item, i) {
+    //     page.setDefaultNavigationTimeout(3000000)
+    //     await page.goto(item.href);
+    //     await page.waitForSelector('#content1');
+    //     let result = await page.evaluate(() => {
+    //         let title = document.querySelector('#info > div.txt_cont > h1').innerText;
+    //         let text = document.querySelector('#content1').innerText;
+    //         return {
+    //             title,
+    //             // text
+    //         }
+    //     });
+    //     await fs.appendFile('./cc.json',JSON.stringify(result),function(err){
+    //         if(err){
+    //             console.log("文件写入失败")
+    //         }else{
+    //             console.log("文件追加成功");
+    //
+    //         }
+    //     })
+    //     await page.close();
+    //     // await saveData(result,id,i)
+    // }))
+    await browser.close();
+
     // await saveData(data)
 }
 
-const saveData = async (data,id) => {
-    console.log('======获取小说所有章节内容成功========')
+const saveData = async (data, id,i) => {
     mongoClient.connect(function (err, db) {
         if (err) throw err;
         var dbo = db.db("novel");
-        dbo.collection("novel" + id).insertMany(data, function (err, res) {
+        dbo.collection("novel" + id).insertOne(data, function (err, res) {
             if (err) throw err;
-            console.log("文档插入成功");
+            console.log("文档插入成功==========" + i);
             db.close();
         });
     });
 }
 
-const novelBookSave = async (url,id) => {
+const novelBookSave = async (url, id) => {
     let lists = await getNovelList(url)
-    let novelData = await getNovelData(lists,id)
+    let novelData = await getNovelData(lists, id)
     // await saveData(novelData,id)
     // await Promise.all(save,name)
 }

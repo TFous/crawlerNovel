@@ -79,14 +79,14 @@ let getNovelPage = async () => {
 
 getNovelPage().then(async lists => {
     await Promise.all(lists.map(async function (item ,i ) {
-        if(i === 1){
+        // if(i<2){
             let href = await item.href
             let hrefSplit = href.split('/')
             let id = hrefSplit[hrefSplit.length-2]
 
             console.log(id)
             await getNovel.novelBookSave(href,id)
-        }
+        // }
     }))
     // Promise.race(promises).then(function (item) {
     //     console.log(item)
