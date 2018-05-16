@@ -6,6 +6,8 @@ var MongoClient = require('mongodb').MongoClient,
 var http = require("https");
 const mongoClient = new MongoClient(new Server('localhost', 27017));
 
+
+
 // var EventEmitter = require('events').EventEmitter;
 // var ee = new EventEmitter();
 // ee.setMaxListeners(500);
@@ -78,18 +80,38 @@ let getNovelPage = async () => {
     });
 }
 
-getNovelPage().then(async lists => {
-    await Promise.all(lists.map(async function (item ,i ) {
-        if(i===1){
-            let href = await item.href
-            let hrefSplit = href.split('/')
-            let id = hrefSplit[hrefSplit.length-2]
+let go = async (item) =>{
+    let href = await item.href
+    let hrefSplit = href.split('/')
+    let id = hrefSplit[hrefSplit.length-2]
+    let result =  await getNovel.fn.novelBookSave(href,id)
+    getNovel.fn.myEmitter.on('event', () => {
+        console.log('触发了一个事件！');
+        start(i+1)
+    });
+}
 
-            console.log(id)
-            await getNovel.novelBookSave(href,id)
+let i = 0;
+function start(starNum) {
+    getNovelPage().then(async lists => {
+        let length = starNum<lists.length?starNum:lists.length
+        for(;i<length;i++){
+            console.log(lists[i])
+            await go(lists[i])
         }
-    }))
-    // Promise.race(promises).then(function (item) {
-    //     console.log(item)
-    // })
-})
+        // await Promise.all(lists.map(async function (item ,i ) {
+        //     if(i===0 || i === 2){
+        //         let href = await item.href
+        //         let hrefSplit = href.split('/')
+        //         let id = hrefSplit[hrefSplit.length-2]
+        //
+        //         console.log(id)
+        //         await getNovel.novelBookSave(href,id)
+        //     }
+        // }))
+        // Promise.race(promises).then(function (item) {
+        //     console.log(item)
+        // })
+    })
+}
+start(3)

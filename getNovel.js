@@ -3,6 +3,9 @@ var MongoClient = require('mongodb').MongoClient,
     Server = require('mongodb').Server;
 const fs = require('fs'); // 引入fs模块
 const mongoClient = new MongoClient(new Server('localhost', 27017));
+const EventEmitter = require('events');
+class MyEmitter extends EventEmitter {}
+const myEmitter = new MyEmitter();
 
 const getNovelList = async (url, id) => {
     const browser = await puppeteer.launch({headless: true});
@@ -22,13 +25,16 @@ const getNovelList = async (url, id) => {
         return urls;
     }, doms);
     browser.close();
-    await mongoClient.connect(function(err, db) {
+    let mongodburl = 'mongodb://localhost:27017'
+    await MongoClient.connect(mongodburl,function(err, db) {
         if (err) throw err;
         var dbo = db.db("test");
         dbo.collection(id).count(function (a,count) {
             getNovelData(lists,id,count)
         })
     });
+
+    return true
     // browser.close();
     // await getNovelData(lists)
     // return data;
@@ -36,7 +42,6 @@ const getNovelList = async (url, id) => {
 
 const getNovelData = async (lists, id,count) => {
     console.log('======获取小说章节列表成功========')
-    console.log(lists.length)
     const browser = await puppeteer.launch({headless: true});
     const page = await browser.newPage();
     let i = count || 0
@@ -100,7 +105,9 @@ const getNovelData = async (lists, id,count) => {
     //     // await saveData(result,id,i)
     // }))
     await browser.close();
-
+    console.log(`======${id}====>结束====`)
+    myEmitter.emit('event');
+    return true
     // await saveData(data)
 }
 
@@ -118,11 +125,14 @@ const saveData = async (data, id,i) => {
 
 const novelBookSave = async (url, id) => {
     let lists = await getNovelList(url, id)
+    return lists
     // let novelData = await getNovelData(lists, id)
     // await saveData(novelData,id)
     // await Promise.all(save,name)
 }
-
-exports.novelBookSave = novelBookSave;
+exports.fn = {
+    novelBookSave,
+    myEmitter
+};
 // export default getNovelList
 // getNovelList(url)
