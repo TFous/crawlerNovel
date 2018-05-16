@@ -4,12 +4,12 @@ var MongoClient = require('mongodb').MongoClient,
 const fs = require('fs'); // 引入fs模块
 const mongoClient = new MongoClient(new Server('localhost', 27017));
 
-const getNovelList = async (url) => {
+const getNovelList = async (url, id) => {
     const browser = await puppeteer.launch({headless: true});
     const page = await browser.newPage();
     await page.goto(url);
     let doms = '#info+div>div.pc_list > ul'
-    const lists = await page.evaluate((sel) => {
+    let lists = await page.evaluate((sel) => {
         const pages = Array.from($(sel).find('li a'));
         const urls = pages.map((a, i) => {
             // if(i<100){
@@ -22,15 +22,24 @@ const getNovelList = async (url) => {
         return urls;
     }, doms);
     browser.close();
+    await mongoClient.connect(function(err, db) {
+        if (err) throw err;
+        var dbo = db.db("test");
+        dbo.collection(id).count(function (a,count) {
+            getNovelData(lists,id,count)
+        })
+    });
+    // browser.close();
     // await getNovelData(lists)
-    return lists;
+    // return data;
 };
-const getNovelData = async (lists, id) => {
+
+const getNovelData = async (lists, id,count) => {
     console.log('======获取小说章节列表成功========')
     console.log(lists.length)
     const browser = await puppeteer.launch({headless: true});
     const page = await browser.newPage();
-    let i = 0
+    let i = count || 0
     let length = lists.length
     for (;i<length;i++){
         await page.goto(lists[i].href);
@@ -44,12 +53,25 @@ const getNovelData = async (lists, id) => {
             }
         });
         // saveData(result,id)
-        await fs.appendFile('./downLoad/'+ id +'.json',JSON.stringify(result),function(err){
+        let data = Object.assign(result,{index:i})
+        await fs.appendFile('./downLoad/'+ id +'.json',JSON.stringify(data),function(err){
             if(err){
                 console.log("文件写入失败")
             }else{
-                console.log(id + "===================文件追加成功");
-
+                console.log(id + "===========>"+i+"========文件追加成功");
+                if(i===length){
+                    console.log('结束================')
+                    let cmdstr = `mongoimport --db test --collection ${id} --file ./downLoad/${id}.json`
+                    var exec = require('child_process').exec;
+                    exec(cmdstr,
+                        function (error, stdout, stderr) {
+                            console.log(stdout)
+                            console.log(stderr)
+                            if (error !== null) {
+                                //console.log('exec error: ' + error);
+                            }
+                        });
+                    }
             }
         })
         // await page.close();
@@ -95,8 +117,8 @@ const saveData = async (data, id,i) => {
 }
 
 const novelBookSave = async (url, id) => {
-    let lists = await getNovelList(url)
-    let novelData = await getNovelData(lists, id)
+    let lists = await getNovelList(url, id)
+    // let novelData = await getNovelData(lists, id)
     // await saveData(novelData,id)
     // await Promise.all(save,name)
 }

@@ -58,6 +58,7 @@ let scrape = async () => {
 let getNovelPage = async () => {
     return scrape().then(async (value) => {
         const browser = await puppeteer.launch({headless: true});
+
         const data = await Promise.all(value.map(async item => {
             const page = await browser.newPage();
             page.setDefaultNavigationTimeout(100000)
@@ -79,14 +80,14 @@ let getNovelPage = async () => {
 
 getNovelPage().then(async lists => {
     await Promise.all(lists.map(async function (item ,i ) {
-        // if(i<2){
+        if(i===1){
             let href = await item.href
             let hrefSplit = href.split('/')
             let id = hrefSplit[hrefSplit.length-2]
 
             console.log(id)
             await getNovel.novelBookSave(href,id)
-        // }
+        }
     }))
     // Promise.race(promises).then(function (item) {
     //     console.log(item)
