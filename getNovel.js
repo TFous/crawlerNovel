@@ -77,6 +77,8 @@ const getNovelData = async (lists, id, count) => {
                 }
             }
         })
+
+
         // await page.close();
     }
     await browser.close();
