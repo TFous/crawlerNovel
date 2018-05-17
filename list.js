@@ -1,10 +1,8 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs'); // 引入fs模块
-const getNovel = require('./getNovel'); // 引入fs模块
-var MongoClient = require('mongodb').MongoClient,
-    Server = require('mongodb').Server;
+const getNovel = require('./getNovel');
+const mongodb = require('./mongoClient');
 var http = require("https");
-const mongoClient = new MongoClient(new Server('localhost', 27017));
 
 
 // var EventEmitter = require('events').EventEmitter;
@@ -49,19 +47,18 @@ let pageListMsg = getList(url).then(async list => {
     return list
 })
 
-pageListMsg.then(function (list) {
-    saveData(list)
-})
+// pageListMsg.then(function (list) {
+//     saveData(list)
+// })
 
 const saveData = async (data) => {
-    let mongodburl = 'mongodb://localhost:27017'
-    MongoClient.connect(mongodburl,function (err, db) {
+    mongodb.mongoClient.connect(function (err, client) {
         if (err) throw err;
-        var dbo = db.db("novel_MSG_List");
+        var dbo = client.db("novel_MSG_List");
         dbo.collection("novelMSG").insertMany(data, function (err, res) {
             if (err) throw err;
             console.log("小说列表插入数据库成功！");
-            db.close();
+            client.close()
         });
     });
 }
@@ -121,35 +118,52 @@ let novelUrlList = getNovelPage().then(function (list) {
 })
 
 let i = 0;
-getNovel.fn.myEmitter.on('event', () => {
+getNovel.fn.myEmitter.setMaxListeners(0)
+mongodb.mongoClient.connect(function (err, client) {
+    if (err) throw err;
+    pageListMsg.then(function (list) {
+        var dbo = client.db("novel_MSG_List");
+        dbo.collection("novelMSG").insertMany(list, function (err, res) {
+            if (err) throw err;
+            console.log("小说列表插入数据库成功！");
+            client.close()
+        });
+    })
+
+    getNovel.fn.myEmitter.on('event', () => {
+        getNovel.fn.myEmitter.removeListener('event', function (item) {
+            console.log('事件移除')
+            console.log(item)
+        });
+        novelUrlList.then(function (list) {
+            i++
+            if(i>list.length-1){
+                console.log('采集结束')
+                return false
+            }
+            console.log(`新增采集=========》${i}`)
+            console.log(`采集地址=========》${list[i].href}`)
+            start(i,list, client)
+        })
+    });
     novelUrlList.then(function (list) {
-        i++
-        console.log(`新增采集=========》${i}`)
-        console.log(`采集地址=========》${list[i].href}`)
-        if(i>list.length-1){
-            console.log('采集结束')
-            return false
+        // 同事采集几条数据
+        let num = 8
+        for(let index = 0;index<num;index++){
+            start(i,list, client)
+            i++
         }
-        start(i,list)
     })
 });
-novelUrlList.then(function (list) {
-    // 同事采集几条数据
-    let num = 3
-    for(let index = 0;index<num;index++){
-        start(i,list)
-        i++
-    }
-})
 
-let go = async (item) => {
+let go = async (item, client) => {
     let href = await item.href
     let hrefSplit = href.split('/')
     let id = hrefSplit[hrefSplit.length - 2]
-    await getNovel.fn.novelBookSave(href, id)
+    getNovel.fn.novelBookSave(href, id, client)
 }
 
-async function start(starNum, lists) {
+async function start(starNum, lists, client) {
     let index = starNum < lists.length-1 ? starNum : lists.length-1
-    await go(lists[index])
+    await go(lists[index], client)
 }
