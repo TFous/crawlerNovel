@@ -14,7 +14,7 @@ const mongoClient = new MongoClient(new Server('localhost', 27017));
 let getList = async () => {
     const browser = await puppeteer.launch({headless: true});
     const page = await browser.newPage();
-    await page.goto('https://www.qisuu.la/soft/sort01/');
+    await page.goto('https://www.qisuu.la/soft/sort09/index_3.html');
     let doms = 'body > div:nth-child(5) > div.list > div > ul'
     const lists = await page.evaluate((sel) => {
         const pagesA = Array.from($(sel).find('li>div.s + a'));
@@ -79,26 +79,48 @@ let getNovelPage = async () => {
         return data
     });
 }
-
-let go = async (item) =>{
+let i = 0;
+start(i,true)
+i++
+start(i)
+getNovel.fn.myEmitter.on('event', () => {
+    console.log('触发了一个事件！');
+    i++
+    start(i)
+});
+let go = async (item,setEmitter = false) =>{
     let href = await item.href
     let hrefSplit = href.split('/')
     let id = hrefSplit[hrefSplit.length-2]
     let result =  await getNovel.fn.novelBookSave(href,id)
-    getNovel.fn.myEmitter.on('event', () => {
-        console.log('触发了一个事件！');
-        start(i+1)
-    });
+    // if(setEmitter === true){
+    //     getNovel.fn.myEmitter.once('event', () => {
+    //         console.log('触发了一个事件！');
+    //         i++
+    //         start(i)
+    //     });
+    // }
+
+
+    // getNovel.fn.myEmitter.once('newListener', (event, listener) => {
+    //     if (event === 'event') {
+    //         // 在开头插入一个新的监听器
+    //         getNovel.fn.myEmitter.on('event', () => {
+    //             console.log('触发了一个事件！');
+    //             i++
+    //             console.log(i)
+    //         });
+    //     }
+    // });
 }
 
-let i = 0;
-function start(starNum) {
+function start(starNum,setEmitter) {
     getNovelPage().then(async lists => {
-        let length = starNum<lists.length?starNum:lists.length
-        for(;i<length;i++){
-            console.log(lists[i])
-            await go(lists[i])
-        }
+        let index = starNum<lists.length?starNum:lists.length
+        // for(;i<length;i++){
+            console.log(lists[index])
+            await go(lists[index],setEmitter)
+        // }
         // await Promise.all(lists.map(async function (item ,i ) {
         //     if(i===0 || i === 2){
         //         let href = await item.href
@@ -114,4 +136,3 @@ function start(starNum) {
         // })
     })
 }
-start(3)
