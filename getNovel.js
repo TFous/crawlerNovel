@@ -47,7 +47,6 @@ const getNovelData = async (lists, id,count) => {
     let length = lists.length
     if(i===length){
         myEmitter.emit('event');
-        console.log(123)
         return
     }
     for (;i<length;i++){

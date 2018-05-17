@@ -7,33 +7,67 @@ var http = require("https");
 const mongoClient = new MongoClient(new Server('localhost', 27017));
 
 
-
 // var EventEmitter = require('events').EventEmitter;
 // var ee = new EventEmitter();
 // ee.setMaxListeners(500);
-let getList = async () => {
+
+/**
+ * 获取小说列表
+ * @returns {Promise<*>}
+ */
+let getList = async (pageListUrl) => {
     const browser = await puppeteer.launch({headless: true});
     const page = await browser.newPage();
-    await page.goto('https://www.qisuu.la/soft/sort09/index_3.html');
-    let doms = 'body > div:nth-child(5) > div.list > div > ul'
+    await page.goto(pageListUrl);
+    let doms = 'body > div:nth-child(5) > div.list > div.listBox'
     const lists = await page.evaluate((sel) => {
         const pagesA = Array.from($(sel).find('li>div.s + a'));
         const pagesImg = Array.from($(sel).find('li>div.s + a>img'));
-        const urls = pagesImg.map((a, i) => {
+        const tag = $(sel).find('div.listTab > h1');
+        const novelMsg = Array.from($(sel).find('li>div.s'));
+        const msg = pagesImg.map((a, i) => {
             return {
                 href: pagesA[i].href.trim(),
                 name: pagesA[i].text,
+                novelMsg: {
+                    author: novelMsg[i].innerText.split('\n大小：')[0].split('作者：')[1],
+                    updateTime: novelMsg[i].innerText.split('更新：')[1],
+                },
+                tag:tag[0].innerText,
                 imgSrc: a.src,
                 code: pagesA[i].href.trim().split('/Shtml')[1].split('.html')[0]
             };
         });
-        return urls;
+        return msg;
     }, doms);
     browser.close();
     return lists;
 };
+
+let url = 'https://www.qisuu.la/soft/sort09/index_4.html'
+let pageListMsg = getList(url).then(async list => {
+    return list
+})
+
+pageListMsg.then(function (list) {
+    saveData(list)
+})
+
+const saveData = async (data) => {
+    let mongodburl = 'mongodb://localhost:27017'
+    MongoClient.connect(mongodburl,function (err, db) {
+        if (err) throw err;
+        var dbo = db.db("novel_MSG_List");
+        dbo.collection("novelMSG").insertMany(data, function (err, res) {
+            if (err) throw err;
+            console.log("小说列表插入数据库成功！");
+            db.close();
+        });
+    });
+}
+
 let scrape = async () => {
-    return getList().then(list => {
+    return getList().then(async list => {
         // list.map(item=>{
         //     http.get(item.img,function (res) {
         //         var imgData = "";
@@ -53,14 +87,16 @@ let scrape = async () => {
         //         });
         //     })
         // })
+        // await saveData(list)
         return list
     })
 
 }
-let getNovelPage = async () => {
-    return scrape().then(async (value) => {
-        const browser = await puppeteer.launch({headless: true});
 
+// 获取对应小说列表 url 列表
+let getNovelPage = async () => {
+    return pageListMsg.then(async (value) => {
+        const browser = await puppeteer.launch({headless: true});
         const data = await Promise.all(value.map(async item => {
             const page = await browser.newPage();
             page.setDefaultNavigationTimeout(100000)
@@ -79,60 +115,41 @@ let getNovelPage = async () => {
         return data
     });
 }
+
+let novelUrlList = getNovelPage().then(function (list) {
+    return list
+})
+
 let i = 0;
-start(i,true)
-i++
-start(i)
 getNovel.fn.myEmitter.on('event', () => {
-    console.log('触发了一个事件！');
-    i++
-    start(i)
+    novelUrlList.then(function (list) {
+        i++
+        console.log(`新增采集=========》${i}`)
+        console.log(`采集地址=========》${list[i].href}`)
+        if(i>list.length-1){
+            console.log('采集结束')
+            return false
+        }
+        start(i,list)
+    })
 });
-let go = async (item,setEmitter = false) =>{
+novelUrlList.then(function (list) {
+    // 同事采集几条数据
+    let num = 3
+    for(let index = 0;index<num;index++){
+        start(i,list)
+        i++
+    }
+})
+
+let go = async (item) => {
     let href = await item.href
     let hrefSplit = href.split('/')
-    let id = hrefSplit[hrefSplit.length-2]
-    let result =  await getNovel.fn.novelBookSave(href,id)
-    // if(setEmitter === true){
-    //     getNovel.fn.myEmitter.once('event', () => {
-    //         console.log('触发了一个事件！');
-    //         i++
-    //         start(i)
-    //     });
-    // }
-
-
-    // getNovel.fn.myEmitter.once('newListener', (event, listener) => {
-    //     if (event === 'event') {
-    //         // 在开头插入一个新的监听器
-    //         getNovel.fn.myEmitter.on('event', () => {
-    //             console.log('触发了一个事件！');
-    //             i++
-    //             console.log(i)
-    //         });
-    //     }
-    // });
+    let id = hrefSplit[hrefSplit.length - 2]
+    await getNovel.fn.novelBookSave(href, id)
 }
 
-function start(starNum,setEmitter) {
-    getNovelPage().then(async lists => {
-        let index = starNum<lists.length?starNum:lists.length
-        // for(;i<length;i++){
-            console.log(lists[index])
-            await go(lists[index],setEmitter)
-        // }
-        // await Promise.all(lists.map(async function (item ,i ) {
-        //     if(i===0 || i === 2){
-        //         let href = await item.href
-        //         let hrefSplit = href.split('/')
-        //         let id = hrefSplit[hrefSplit.length-2]
-        //
-        //         console.log(id)
-        //         await getNovel.novelBookSave(href,id)
-        //     }
-        // }))
-        // Promise.race(promises).then(function (item) {
-        //     console.log(item)
-        // })
-    })
+async function start(starNum, lists) {
+    let index = starNum < lists.length-1 ? starNum : lists.length-1
+    await go(lists[index])
 }
