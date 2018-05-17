@@ -20,14 +20,18 @@ const getNovelList = async (url, id, client) => {
         return urls;
     }, doms);
     browser.close();
-    // mongodb.mongoClient.connect(function (err, client) {
-    //     if (err) throw err;
-        var dbo = client.db("test");
-        dbo.collection(id).count(async function (a, count) {
-            await getNovelData(lists, id, count)
-            client.close()
-        })
-    // });
+    var dbs = client.db("novel_Chapters_List");
+    dbs.collection(id).insertMany(lists, function (err, res) {
+        if (err) throw err;
+        console.log("小说章节插入数据库成功！");
+    });
+
+    // 获取当前小说章节总数
+    var dbo = client.db("novel_Details_List");
+    dbo.collection(id).count(async function (a, count) {
+        await getNovelData(lists, id, count)
+    })
+
 };
 const getNovelData = async (lists, id, count) => {
     console.log('======获取小说章节列表成功========')
@@ -59,7 +63,7 @@ const getNovelData = async (lists, id, count) => {
                 console.log(id + "===========>" + i + "========文件追加成功");
                 if (i === length) {
                     console.log('结束================')
-                    let cmdstr = `mongoimport --db test --collection ${id} --file ./downLoad/${id}.json`
+                    let cmdstr = `mongoimport --db novel_Details_List --collection ${id} --file ./downLoad/${id}.json`
                     var exec = require('child_process').exec;
                     exec(cmdstr,
                         function (error, stdout, stderr) {

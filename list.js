@@ -4,11 +4,6 @@ const getNovel = require('./getNovel');
 const mongodb = require('./mongoClient');
 var http = require("https");
 
-
-// var EventEmitter = require('events').EventEmitter;
-// var ee = new EventEmitter();
-// ee.setMaxListeners(500);
-
 /**
  * 获取小说列表
  * @returns {Promise<*>}
@@ -51,17 +46,17 @@ let pageListMsg = getList(url).then(async list => {
 //     saveData(list)
 // })
 
-const saveData = async (data) => {
-    mongodb.mongoClient.connect(function (err, client) {
-        if (err) throw err;
-        var dbo = client.db("novel_MSG_List");
-        dbo.collection("novelMSG").insertMany(data, function (err, res) {
-            if (err) throw err;
-            console.log("小说列表插入数据库成功！");
-            client.close()
-        });
-    });
-}
+// const saveData = async (data) => {
+//     mongodb.mongoClient.connect(function (err, client) {
+//         if (err) throw err;
+//         var dbo = client.db("novel_MSG_List");
+//         dbo.collection("novelMSG").insertMany(data, function (err, res) {
+//             if (err) throw err;
+//             console.log("小说列表插入数据库成功！");
+//             client.close()
+//         });
+//     });
+// }
 
 let scrape = async () => {
     return getList().then(async list => {
@@ -123,21 +118,20 @@ mongodb.mongoClient.connect(function (err, client) {
     if (err) throw err;
     pageListMsg.then(function (list) {
         var dbo = client.db("novel_MSG_List");
-        dbo.collection("novelMSG").insertMany(list, function (err, res) {
+        dbo.collection("novel_MSG").insertMany(list, function (err, res) {
             if (err) throw err;
             console.log("小说列表插入数据库成功！");
-            client.close()
         });
     })
 
     getNovel.fn.myEmitter.on('event', () => {
-        getNovel.fn.myEmitter.removeListener('event', function (item) {
-            console.log('事件移除')
-            console.log(item)
-        });
+        // getNovel.fn.myEmitter.removeListener('event', function (item) {
+        //     console.log('事件移除')
+        //     console.log(item)
+        // });
         novelUrlList.then(function (list) {
             i++
-            if(i>list.length-1){
+            if(i>=list.length){
                 console.log('采集结束')
                 return false
             }
@@ -148,11 +142,11 @@ mongodb.mongoClient.connect(function (err, client) {
     });
     novelUrlList.then(function (list) {
         // 同事采集几条数据
-        let num = 8
+        let num = 7
         for(let index = 0;index<num;index++){
-            start(i,list, client)
-            i++
+            start(index,list, client)
         }
+        i= i + 6
     })
 });
 
@@ -164,6 +158,6 @@ let go = async (item, client) => {
 }
 
 async function start(starNum, lists, client) {
-    let index = starNum < lists.length-1 ? starNum : lists.length-1
+    let index = starNum < lists.length ? starNum : lists.length - 1
     await go(lists[index], client)
 }
